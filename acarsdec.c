@@ -227,11 +227,6 @@ int main(int argc, char **argv)
 	}
 
 
-	if(outtype==3) {
-		verbose=0;
-		cls();
-	}
-
 	if (verbose)
 		fprintf(stderr, "Decoding %d channels\n", nbch);
 

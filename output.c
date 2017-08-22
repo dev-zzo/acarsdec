@@ -16,8 +16,6 @@ typedef struct {
 	unsigned char ack;
 	unsigned char label[3];
 	unsigned char bid;
-	unsigned char no[5];
-	unsigned char fid[7];
 	unsigned char bs, be;
 	unsigned char txt[250];
 	int err, lvl;
@@ -137,9 +135,8 @@ void outpp(acarsmsg_t * msg)
 		if (*pstr == '\n' || *pstr == '\r')
 			*pstr = ' ';
 
-	sprintf(pkt, "AC%1c %7s %1c %2s %1c %4s %6s %s",
-		msg->mode, msg->addr, msg->ack, msg->label, msg->bid, msg->no,
-		msg->fid, txt);
+	sprintf(pkt, "AC%1c %7s %1c %2s %1c %s",
+		msg->mode, msg->addr, msg->ack, msg->label, msg->bid, txt);
 
 	write(sockfd, pkt, strlen(pkt));
 }
@@ -152,11 +149,11 @@ void outsv(acarsmsg_t * msg, int chn, time_t tm)
 	tmp = gmtime(&tm);
 
 	sprintf(pkt,
-		"%8s %1d %02d/%02d/%04d %02d:%02d:%02d %1d %03d %1c %7s %1c %2s %1c %4s %6s %s",
+		"%8s %1d %02d/%02d/%04d %02d:%02d:%02d %1d %03d %1c %7s %1c %2s %1c %s",
 		idstation, chn + 1, tmp->tm_mday, tmp->tm_mon + 1,
 		tmp->tm_year + 1900, tmp->tm_hour, tmp->tm_min, tmp->tm_sec,
 		msg->err, msg->lvl, msg->mode, msg->addr, msg->ack, msg->label,
-		msg->bid, msg->no, msg->fid, msg->txt);
+		msg->bid, msg->txt);
 
 	write(sockfd, pkt, strlen(pkt));
 }
@@ -179,10 +176,6 @@ static void printmsg(acarsmsg_t * msg, int chn, time_t t)
 		fprintf(fdout, "Id : %1c ", msg->bid);
 		if(msg->ack==0x15) fprintf(fdout, "Nak\n"); else fprintf(fdout, "Ack : %1c\n", msg->ack);
 		fprintf(fdout, "Aircraft reg: %s ", msg->addr);
-		if(msg->mode <= 'Z') {
-			fprintf(fdout, "Flight id: %s\n", msg->fid);
-			fprintf(fdout, "No: %4s", msg->no);
-		}
 	}
 	fprintf(fdout, "\n");
 	if(msg->txt[0]) fprintf(fdout, "%s\n", msg->txt);
@@ -291,12 +284,6 @@ static void printjson(acarsmsg_t * msg, int chn, time_t t)
 		}
 		fprintf(fdout, ",\"tail\":");
 		PRINTS(msg->addr);
-		if(msg->mode <= 'Z') {
-			fprintf(fdout, ",\"flight\":");
-			PRINTS(msg->fid);
-			fprintf(fdout, ",\"msgno\":");
-			PRINTS(msg->no);
-		}
 	}
 	fprintf(fdout, ",\"text\":");
 	PRINTS(msg->txt);
@@ -324,103 +311,10 @@ static void printoneline(acarsmsg_t * msg, int chn, time_t t)
 
 	if (inmode != 2)
 		printdate(t);
-	fprintf(fdout, " %7s %6s %1c %2s %4s ", msg->addr, msg->fid, msg->mode, msg->label, msg->no);
+	fprintf(fdout, " %7s %1c %2s ", msg->addr, msg->mode, msg->label);
 	fprintf(fdout, "%s", txt);
 	fprintf(fdout, "\n");
 	fflush(fdout);
-}
-
-typedef struct flight_s flight_t;
-struct flight_s {
-	flight_t *next;
-	char addr[8];
-	char fid[7];
-	time_t ts,tl;
-	int chm;
-	int nbm;
-};
-static flight_t  *flight_head=NULL;
-
-static void addFlight(acarsmsg_t * msg, int chn, time_t t)
-{
-	flight_t *fl,*flp;
-
-	fl=flight_head;
-	flp=NULL;
-	while(fl) {
-		if(strcmp(msg->addr,fl->addr)==0) break;
-		flp=fl;
-		fl=fl->next;
-	}
-
-	if(fl==NULL) {
-		fl=malloc(sizeof(flight_t));
-		fl->nbm=0;
-		fl->ts=t;
-		fl->chm=0;
-		strncpy(fl->addr,msg->addr,8);
-		strncpy(fl->fid,msg->fid,7);
-		fl->next=NULL;
-	}
-	fl->tl=t;
-	fl->chm|=(1<<chn);
-	fl->nbm+=1;
-
-	if(flp) {
-		flp->next=fl->next;
-		fl->next=flight_head;
-	}
-	flight_head=fl;
-
-	flp=NULL;
-	while(fl) {
-		if(fl->tl<(t-mdly)) {
-			if(flp) {
-				flp->next=fl->next;
-				free(fl);
-				fl=flp->next;
-			} else {
-				flight_head=fl->next;
-				free(fl);
-				fl=flight_head;
-			}
-		} else {
-			flp=fl;
-			fl=fl->next;
-		}
-	}
-}
-
-
-void cls(void)
-{
-	printf("\x1b[H\x1b[2J");
-}
-
-static void printmonitor(acarsmsg_t * msg, int chn, time_t t)
-{
-	flight_t *fl;
-
-	cls();
-
-	printf("             Acarsdec monitor\n");
-	printf(" Aircraft Flight  Nb Channels   Last     First\n");
-
-	fl=flight_head;
-	while(fl) {
-		int i;
-
-		printf("%8s %7s %3d ", fl->addr, fl->fid,fl->nbm);
-		for(i=0;i<nbch;i++) printf("%c",(fl->chm&(1<<i))?'x':'.');
-		for(;i<MAXNBCHANNELS;i++) printf(" ");
-		printf(" ");printtime(fl->tl);
-		printf(" ");printtime(fl->ts);
-		printf("\n");
-
-		fl=fl->next;
-	}
-
-	//printmsg(msg,chn,t);
 }
 
 
@@ -460,31 +354,12 @@ void outputmsg(const msgblk_t * blk)
 	msg.bs = blk->txt[k];
 	k++;
 
-	msg.no[0] = '\0';
-	msg.fid[0] = '\0';
 	msg.txt[0] = '\0';
 
 	if ((msg.bs == 0x03 || msg.mode > 'Z') && airflt)
 		return;
 
 	if (msg.bs != 0x03) {
-		if (msg.mode <= 'Z' && msg.bid <= '9') {
-			/* message no */
-			for (i = 0; i < 4 && k < blk->len - 1; i++, k++) {
-				msg.no[i] = blk->txt[k];
-			}
-			msg.no[i] = '\0';
-
-			/* Flight id */
-			for (i = 0; i < 6 && k < blk->len - 1; i++, k++) {
-				msg.fid[i] = blk->txt[k];
-			}
-			msg.fid[i] = '\0';
-
-			if(outtype==3)
-				addFlight(&msg,blk->chn,blk->tm);
-		}
-
 		/* Message txt */
 		for (i = 0; k < blk->len - 1; i++, k++)
 			msg.txt[i] = blk->txt[k];
@@ -509,9 +384,6 @@ void outputmsg(const msgblk_t * blk)
 		break;
 	case 2:
 		printmsg(&msg, blk->chn, blk->tm);
-		break;
-	case 3:
-		printmonitor(&msg, blk->chn, blk->tm);
 		break;
 	case 4:
 		printjson(&msg, blk->chn, blk->tm);
