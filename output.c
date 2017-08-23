@@ -175,8 +175,9 @@ struct _acars_udp_message_t {
 
 void outraw(const msgblk_t * blk, int chn, time_t tm)
 {
-	acars_udp_message_t msg = {0};
+	acars_udp_message_t msg;
 
+	memset(&msg, 0, sizeof(msg));
 	strncpy(&msg.header.station_id[0], &idstation[0], STATION_ID_LENGTH);
 	msg.header.timestamp = htonl(tm);
 	msg.header.fc = htonl((unsigned)(channel[chn].Fr / 1000.0));
