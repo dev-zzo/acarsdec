@@ -28,7 +28,7 @@
 channel_t channel[MAXNBCHANNELS];
 unsigned int nbch;
 
-char *idstation;
+char *idstation = "";
 int inmode = 0;
 int verbose = 0;
 int outtype = 2;
