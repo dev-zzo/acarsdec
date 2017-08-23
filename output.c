@@ -55,7 +55,7 @@ int initOutput(char *logfilename, char *Rawaddr)
 		*port = 0;
 		port++;
 		if (*port != ':')
-			port = "5555";
+			port = "13963";
 		else
 			port++;
 	} else {
@@ -63,7 +63,7 @@ int initOutput(char *logfilename, char *Rawaddr)
 		addr = Rawaddr;
 		port = strstr(addr, ":");
 		if (port == NULL)
-			port = "5555";
+			port = "13963";
 		else {
 			*port = 0;
 			port++;
@@ -157,6 +157,34 @@ void outsv(acarsmsg_t * msg, int chn, time_t tm)
 
 	write(sockfd, pkt, strlen(pkt));
 }
+
+#define STATION_ID_LENGTH 8
+
+typedef struct _acars_udp_message_header_t acars_udp_message_header_t;
+struct _acars_udp_message_header_t {
+    char station_id[STATION_ID_LENGTH];
+    unsigned int fc;
+    unsigned int timestamp;
+};
+
+typedef struct _acars_udp_message_t acars_udp_message_t;
+struct _acars_udp_message_t {
+    acars_udp_message_header_t header;
+    char payload[256];
+};
+
+void outraw(const msgblk_t * blk, int chn, time_t tm)
+{
+	acars_udp_message_t msg = {0};
+
+	strncpy(&msg.header.station_id[0], &idstation[0], STATION_ID_LENGTH);
+	msg.header.timestamp = htonl(tm);
+	msg.header.fc = htonl((unsigned)(channel[chn].Fr / 1000.0));
+	memcpy(&msg.payload[0], &blk->txt[0], blk->len);
+
+	write(sockfd, &msg, sizeof(msg.header) + blk->len);
+}
+
 
 static void printmsg(acarsmsg_t * msg, int chn, time_t t)
 {
@@ -323,6 +351,11 @@ void outputmsg(const msgblk_t * blk)
 	acarsmsg_t msg;
 	int i, k;
 
+	if (sockfd > 0) {
+		if (netout == 1)
+			outraw(blk, blk->chn, blk->tm);
+	}
+
 	/* fill msg struct */
 	msg.lvl = blk->lvl;
 	msg.err = blk->err;
@@ -372,8 +405,6 @@ void outputmsg(const msgblk_t * blk)
 	if (sockfd > 0) {
 		if (netout == 0)
 			outpp(&msg);
-		else
-			outsv(&msg, blk->chn, blk->tm);
 	}
 
 	switch (outtype) {

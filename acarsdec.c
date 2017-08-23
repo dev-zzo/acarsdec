@@ -77,7 +77,7 @@ static void usage(void)
 	fprintf(stderr,
 		" -n ipaddr:port\t\t: send acars messages to addr:port on UDP in planeplotter compatible format\n");
 	fprintf(stderr,
-		" -N ipaddr:port\t\t: send acars messages to addr:port on UDP in acarsdev native format\n");
+		" -N ipaddr:port\t\t: send acars messages to addr:port on UDP in native format\n");
 	fprintf(stderr,
 		" -i stationid\t\t: station id used in acarsdec network format.\n\n");
 #ifdef WITH_ALSA
