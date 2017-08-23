@@ -8,6 +8,7 @@
 
 # RTL only conf
 CFLAGS= -Ofast -pthread -D WITH_RTL -I.  `pkg-config --cflags librtlsdr`
+CFLAGS+= -mcpu=cortex-a53 -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits
 LDLIBS= -lm -pthread   -lrtlsdr `pkg-config --libs librtlsdr`
 
 acarsdec:	acarsdec.o acars.o msk.o rtl.o air.o output.o alsa.o soundfile.o raw.o
